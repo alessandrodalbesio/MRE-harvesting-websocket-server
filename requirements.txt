@@ -1,2 +1,2 @@
-Flask
-flask-socketio
+Flask==2.3
+flask-socketio==5.3

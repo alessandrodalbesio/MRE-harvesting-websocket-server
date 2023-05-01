@@ -14,11 +14,11 @@ To install and integrate this repository with the main server you must follow th
 5. ... Integration with server to be defined ...
 6. To integrate the websocket server with the main server please reference the README file into the server repository in the section `WebSocket Integration`
 
-## Authors and acknowledgment
+## Authors
 This repository is part of the project "Mixed Reality Environment For Harvesting Study" done by Alessandro Dalbesio 352298.<br>
 The project has been done in the CREATE LAB (EPFL).<br>
 Professor: Josie Hughes<br>
 Supervisor: Ilic Stefan<br>
 
 ## License
-This project is under MIT license
+This project is under [MIT] license

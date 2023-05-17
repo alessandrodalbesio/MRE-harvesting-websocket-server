@@ -1,6 +1,5 @@
 from flask import Flask, jsonify
 from flask_socketio import SocketIO, emit
-from settings import *
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -75,7 +74,12 @@ def set_active_model(data):
 
 @socketio.on('unset-active-model')
 def unset_active_model():
+    global activeModel
+    activeModel['IDModel'] = None
+    activeModel['IDTexture'] = None
+
     emit('unset-active-model', broadcast=True, include_self=False)
+
 
 # Connection and disconnection management
 def refresh():

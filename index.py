@@ -1,115 +1,60 @@
-from flask import Flask, jsonify
-from flask_socketio import SocketIO, emit
+import json
+import asyncio
+import websockets
 
-app = Flask(__name__)
-socketio = SocketIO(app)
+connected_clients = set()
 
+async def handle_message(message, websocket):
+    message_data = json.loads(message)
+    message_type = message_data.get('type')
 
-# Needed for the polling from the headset
-# No locking mechanism needed as the value is only read
-activeModel = { 'IDModel': None, 'IDTexture': None }
-needRefreshDB = False
+    if message_type == 'new-model':
+        IDModel = message_data.get('data').get('IDModel')
+        await broadcast_message({'type': 'new-model', 'data': {'IDModel': IDModel}}, exclude=[websocket])
+    elif message_type == 'update-model':
+        IDModel = message_data.get('data').get('IDModel')
+        await broadcast_message({'type': 'update-model', 'data': {'IDModel': IDModel}}, exclude=[websocket])
+    elif message_type == 'delete-model':
+        await broadcast_message({'type': 'delete-model', 'data': message_data.get('data')}, exclude=[websocket])
+    elif message_type == 'new-texture':
+        await broadcast_message({'type': 'new-texture', 'data': message_data.get('data')}, exclude=[websocket])
+    elif message_type == 'delete-texture':
+        await broadcast_message({'type': 'delete-texture', 'data': message_data.get('data')}, exclude=[websocket])
+    elif message_type == 'texture-set-default':
+        await broadcast_message({'type': 'texture-set-default', 'data': message_data.get('data')}, exclude=[websocket])
+    elif message_type == 'lock-model':
+        await broadcast_message({'type': 'lock-model', 'data': message_data.get('data')}, exclude=[websocket])
+    elif message_type == 'unlock-model':
+        await broadcast_message({'type': 'unlock-model', 'data': message_data.get('data')}, exclude=[websocket])
+    elif message_type == 'set-active-model':
+        IDModel = message_data.get('data').get('IDModel')
+        IDTexture = message_data.get('data').get('IDTexture')
+        await broadcast_message({'type': 'set-active-model', 'data': {'IDModel': IDModel, 'IDTexture': IDTexture}}, exclude=[websocket])
+    elif message_type == 'unset-active-model':
+        await broadcast_message({'type': 'unset-active-model'}, exclude=[websocket])
 
+async def broadcast_message(message, exclude=None):
+    for client in connected_clients:
+        if client != exclude:
+            await client.send(json.dumps(message))
 
-# Models management
-@socketio.on('new-model')
-def model_new(data):
-    global needRefreshDB
-    needRefreshDB = True
-    IDModel = data.get('IDModel')
-    
-    emit('new-model', {'IDModel': IDModel}, broadcast=True, include_self=False)
+async def handle_websocket(websocket, path):
+    connected_clients.add(websocket)
+    try:
+        while True:
+            message = await websocket.recv()
+            if message is not None:
+                await handle_message(message, websocket)
+    finally:
+        connected_clients.remove(websocket)
 
-@socketio.on('update-model')
-def model_update(data):
-    global needRefreshDB
-    needRefreshDB = True
-    IDModel = data.get('IDModel')
+async def refresh():
+    await broadcast_message({'type': 'refresh'})
 
-    emit('update-model', {'IDModel': IDModel}, broadcast=True, include_self=False)
-
-@socketio.on('delete-model')
-def model_delete(data):
-    global needRefreshDB
-    needRefreshDB = True
-
-    emit('delete-model', data, broadcast=True, include_self=False)
-
-# Textures management
-@socketio.on('new-texture')
-def texture_new(data):
-    global needRefreshDB
-    needRefreshDB = True
-
-    emit('new-texture', data, broadcast=True, include_self=False)
-
-@socketio.on('delete-texture')
-def texture_delete(data):
-    global needRefreshDB
-    needRefreshDB = True
-
-    emit('delete-texture', data, broadcast=True, include_self=False)
-
-@socketio.on('texture-set-default')
-def texture_set_default(data):
-    emit('texture-set-default', data, broadcast=True, include_self=False)
-
-# Locking
-@socketio.on('lock-model')
-def active_model(data):
-    emit('lock-model', data, broadcast=True, include_self=False)
-
-@socketio.on('unlock-model')
-def deactivate_model(data):
-    emit('unlock-model', data, broadcast=True, include_self=False)
-
-# Active model selection
-@socketio.on('set-active-model')
-def set_active_model(data):
-    global activeModel
-    activeModel['IDModel'] = data.get('IDModel')
-    activeModel['IDTexture'] = data.get('IDTexture')
-
-    emit('set-active-model', {'IDModel': activeModel['IDModel'], 'IDTexture': activeModel['IDTexture']}, broadcast=True, include_self=False)
-
-@socketio.on('unset-active-model')
-def unset_active_model():
-    global activeModel
-    activeModel['IDModel'] = None
-    activeModel['IDTexture'] = None
-
-    emit('unset-active-model', broadcast=True, include_self=False)
-
-
-# Connection and disconnection management
-def refresh():
-    emit('refresh', broadcast=True, include_self=False)
-
-@socketio.on('connect')
-def connect():
-    # When a new user connect refresh everything
-    refresh()
-
-@socketio.on('disconnect')
-def disconnect():
-    # When a new user disconnect refresh everything
-    refresh()  
-
-# Only for headset
-@app.get('/active-model') 
-def getActiveModel():
-    global activeModel
-    return jsonify(activeModel), 200
-
-@app.get('/need-local-database-refresh')
-def needLocalDatabaseRefresh():
-    global needRefreshDB
-    toReturnValue = needRefreshDB
-    if toReturnValue:
-        needRefreshDB = False
-    return jsonify({
-        'needLocalDBRefresh': toReturnValue
-    }), 200
+async def start_server():
+    server = await websockets.serve(handle_websocket, 'localhost', 9500)
+    print("WebSocket server started...")
+    await server.wait_closed()
 
 if __name__ == '__main__':
-    socketio.run(app, port=9500, debug=False)
+    asyncio.run(start_server())

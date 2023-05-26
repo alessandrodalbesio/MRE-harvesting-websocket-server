@@ -1,60 +1,87 @@
+# Import all the required modules
+from modules.logging import *
+from modules.settings import *
 import json
 import asyncio
 import websockets
+import traceback
 
+# Create the sets for the connected clients
 connected_clients = set()
+optitrack_clients = set()
 
+# Create the logger
+websocket_logger = logger()
+
+# Managed messages from the server (not related to optitrack)
+valid_messages_type = ['new-model', 'update-model', 'delete-model', 'new-texture', 'delete-texture', 'texture-set-default', 'lock-model', 'unlock-model', 'set-active-model', 'refresh-active-model', 'unset-active-model']
+
+# Function to handle the messages that are sent to the websocket server
 async def handle_message(message, websocket):
-    message_data = json.loads(message)
-    message_type = message_data.get('type')
+    message = json.loads(message)
+    type = message.get('type')
+    data = message.get('data')
 
-    if message_type == 'new-model':
-        IDModel = message_data.get('data').get('IDModel')
-        await broadcast_message({'type': 'new-model', 'data': {'IDModel': IDModel}}, exclude=[websocket])
-    elif message_type == 'update-model':
-        IDModel = message_data.get('data').get('IDModel')
-        await broadcast_message({'type': 'update-model', 'data': {'IDModel': IDModel}}, exclude=[websocket])
-    elif message_type == 'delete-model':
-        await broadcast_message({'type': 'delete-model', 'data': message_data.get('data')}, exclude=[websocket])
-    elif message_type == 'new-texture':
-        await broadcast_message({'type': 'new-texture', 'data': message_data.get('data')}, exclude=[websocket])
-    elif message_type == 'delete-texture':
-        await broadcast_message({'type': 'delete-texture', 'data': message_data.get('data')}, exclude=[websocket])
-    elif message_type == 'texture-set-default':
-        await broadcast_message({'type': 'texture-set-default', 'data': message_data.get('data')}, exclude=[websocket])
-    elif message_type == 'lock-model':
-        await broadcast_message({'type': 'lock-model', 'data': message_data.get('data')}, exclude=[websocket])
-    elif message_type == 'unlock-model':
-        await broadcast_message({'type': 'unlock-model', 'data': message_data.get('data')}, exclude=[websocket])
-    elif message_type == 'set-active-model':
-        IDModel = message_data.get('data').get('IDModel')
-        IDTexture = message_data.get('data').get('IDTexture')
-        await broadcast_message({'type': 'set-active-model', 'data': {'IDModel': IDModel, 'IDTexture': IDTexture}}, exclude=[websocket])
-    elif message_type == 'unset-active-model':
-        await broadcast_message({'type': 'unset-active-model'}, exclude=[websocket])
+    if type == 'ping': # Manage ping messages
+        await send_message({'type': 'pong'}, websocket)
+    elif type == 'optitrack-data': # Manage optitrack data messages
+        await broadcast_message_to_optitrack_clients({'type': 'optitrack-data', 'data': data})
+    elif type == 'join-optitrack-room': # Join the optitrack room
+        optitrack_clients.add(websocket)
+        websocket_logger.info("Optitrack client joined")
+    elif type == 'leave-optitrack-room': # Leave the optitrack room
+        optitrack_clients.remove(websocket)
+        websocket_logger.info("Optitrack client left")
+    elif type in valid_messages_type:
+        await broadcast_message(message, websocket)
+    else:
+        return
 
+
+# Broadcast a message to all the connected users
 async def broadcast_message(message, exclude=None):
     for client in connected_clients:
         if client != exclude:
             await client.send(json.dumps(message))
 
+# Broadcast a message only to the connected users who are in the optitrack_clients set
+async def broadcast_message_to_optitrack_clients(message):
+    for client in connected_clients:
+        if client in optitrack_clients:
+            await client.send(json.dumps(message))
+
+# Send a message to a specific user
+async def send_message(message, websocket):
+    await websocket.send(json.dumps(message))
+
+# Function to handle the websocket connection
 async def handle_websocket(websocket, path):
-    connected_clients.add(websocket)
+    connected_clients.add(websocket) # Add the client to the set of connected clients
+    websocket_logger.debug("A new device has connected") # Log the connection
     try:
+        # Handle the messages that are sent to the websocket server
         while True:
             message = await websocket.recv()
             if message is not None:
                 await handle_message(message, websocket)
+    except websockets.exceptions.ConnectionClosedOK:
+        websocket_logger.debug("A device has disconnected") # Log the disconnection
+    except Exception as e:
+        websocket_logger.error(str(traceback.format_exc())) # Log the error
     finally:
-        connected_clients.remove(websocket)
+        connected_clients.remove(websocket) # Remove the client from the set of connected clients
 
-async def refresh():
-    await broadcast_message({'type': 'refresh'})
-
+# Function to start the websocket server
 async def start_server():
-    server = await websockets.serve(handle_websocket, 'localhost', 9500)
-    print("WebSocket server started...")
-    await server.wait_closed()
+    # Start the websocket server
+    server = await websockets.serve(handle_websocket, WEBSOCKET_SERVER_ADDRESS, WEBSOCKET_SERVER_PORT) # Create the websocket server
+    websocket_logger.info("Websocket server starter") # Log the start of the websocket server
+    await server.wait_closed() 
 
 if __name__ == '__main__':
-    asyncio.run(start_server())
+    try:
+        asyncio.run(start_server()) # Start the websocket server
+    except KeyboardInterrupt:
+        websocket_logger.info("Websocket server stopped")
+    except Exception as e:
+        websocket_logger.error(str(traceback.format_exc()))

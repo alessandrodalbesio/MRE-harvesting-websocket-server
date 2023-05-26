@@ -1,18 +1,23 @@
-# websocket-server
+# Websocket Server
 
 ## Getting started
-This is the websocket implementation needed for implementing a dual-way communication between the devices (e.g. notify the headset that a model has been uploaded to retrieve its informations).<br>
-It has been choosen to separate this code from the main server (even if it's only composed by few files) since this is project dependent while the server can be used for any project involving the creation of a 3D environment.<br>
-To create a websocket implementation that can interact with the main server read the README file of the server repository in the section `WebSocket Integration`
+This is the websocket implementation needed for implementing a dual-way real time communication between the devices. <br><br>
+The main functionalities that this server implements are:
+- Real time synchronization between all the devices
+- Real time synchronization between the optitrack server and the headset
 
 ## Installation
-To install and integrate this repository with the main server you must follow these steps:
-1. Create a new folder in the directory `...` on the server.
-2. Move to the newly created folder
-3. Clone this repository into that folder with the command: `...`
-4. Define the parameters inside the <code>settings.py</code> file (if you try to start this file without this step an error will be thrown).
-5. ... Integration with server to be defined ...
-6. To integrate the websocket server with the main server please reference the README file into the server repository in the section `WebSocket Integration`
+To use the code into this repository you just need to clode the code and set the parameters in the file <code>settings.py</code>. <br>
+Without settings these parameters you won't be able to start the code! <br>
+A brief description of the parameters can be found in the file itself.
+
+## Requirements
+This code has been tested with python 3.11 <br>
+All the needed modules can be installed from the <code>requirements.txt</code> with the following code:
+```bash
+pip install -r requirements.txt
+```
+If you wish to use a virtual environment just remember to activate it before running this command!
 
 ## Authors
 This repository is part of the project "Mixed Reality Environment For Harvesting Study" done by Alessandro Dalbesio 352298.<br>

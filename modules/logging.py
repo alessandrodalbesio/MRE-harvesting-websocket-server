@@ -8,7 +8,7 @@ class logger:
         self.logger.setLevel(logging.DEBUG)
 
         # Create the logging file handler
-        fh = logging.FileHandler("websocket_server.log")
+        fh = logging.FileHandler(LOGGER_FILE_NAME)
         fh.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
         fh.setFormatter(formatter)

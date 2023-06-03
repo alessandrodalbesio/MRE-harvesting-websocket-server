@@ -13,8 +13,7 @@ optitrack_clients = set()
 # Create the logger
 websocket_logger = logger()
 
-# Managed messages from the server (not related to optitrack)
-valid_messages_type = ['new-model', 'update-model', 'delete-model', 'new-texture', 'delete-texture', 'texture-set-default', 'lock-model', 'unlock-model', 'set-active-model', 'refresh-active-model', 'unset-active-model']
+num_errors = 0
 
 # Function to handle the messages that are sent to the websocket server
 async def handle_message(message, websocket):
@@ -28,15 +27,14 @@ async def handle_message(message, websocket):
         await broadcast_message_to_optitrack_clients({'type': 'optitrack-data', 'data': data})
     elif type == 'join-optitrack-room': # Join the optitrack room
         optitrack_clients.add(websocket)
-        websocket_logger.info("Optitrack client joined")
+        websocket_logger.debug("Optitrack client joined")
     elif type == 'leave-optitrack-room': # Leave the optitrack room
         optitrack_clients.remove(websocket)
-        websocket_logger.info("Optitrack client left")
+        websocket_logger.debug("Optitrack client left")
     elif type in valid_messages_type:
         await broadcast_message(message, websocket)
     else:
         return
-
 
 # Broadcast a message to all the connected users
 async def broadcast_message(message, exclude=None):
@@ -56,30 +54,36 @@ async def send_message(message, websocket):
 
 # Function to handle the websocket connection
 async def handle_websocket(websocket, path):
-    connected_clients.add(websocket) # Add the client to the set of connected clients
-    websocket_logger.debug("A new device has connected") # Log the connection
-    try:
-        # Handle the messages that are sent to the websocket server
-        while True:
+    websocket_logger.debug("New client connected")
+    connected_clients.add(websocket)
+    while True:
+        try: 
             message = await websocket.recv()
             if message is not None:
                 await handle_message(message, websocket)
-    except websockets.exceptions.ConnectionClosedOK:
-        websocket_logger.debug("A device has disconnected") # Log the disconnection
-    except Exception as e:
-        websocket_logger.error(str(traceback.format_exc())) # Log the error
-    finally:
-        connected_clients.remove(websocket) # Remove the client from the set of connected clients
+        except websockets.exceptions.ConnectionClosedError:
+            break
+        except websockets.exceptions.ConnectionClosedOK:
+            break
+        except Exception as e:
+            if num_errors > LIMIT_EXCEPTIONS_BEFORE_RESTART:
+                raise("Too many errors, restarting the websocket server")
+            num_errors += 1
+            websocket_logger.error(str(traceback.format_exc()))
+    connected_clients.remove(websocket)
+    if(websocket in optitrack_clients):
+        optitrack_clients.remove(websocket)
+    websocket_logger.debug("Client disconnected")
+    
 
 # Function to start the websocket server
 async def start_server():
-    # Start the websocket server
-    server = await websockets.serve(handle_websocket, WEBSOCKET_SERVER_ADDRESS, WEBSOCKET_SERVER_PORT) # Create the websocket server
-    websocket_logger.info("Websocket server starter") # Log the start of the websocket server
-    await server.wait_closed() 
+    async with websockets.serve(handle_websocket, WEBSOCKET_SERVER_ADDRESS, WEBSOCKET_SERVER_PORT):
+        await asyncio.Future() # Keep the server running
 
 if __name__ == '__main__':
     try:
+        websocket_logger.info("Websocket server started")
         asyncio.run(start_server()) # Start the websocket server
     except KeyboardInterrupt:
         websocket_logger.info("Websocket server stopped")

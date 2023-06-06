@@ -56,6 +56,8 @@ async def send_message(message, websocket):
 async def handle_websocket(websocket, path):
     websocket_logger.debug("New client connected")
     connected_clients.add(websocket)
+    # Send the refresh message to the other clients
+    await broadcast_message({'type': 'refresh'}, websocket)
     while True:
         try: 
             message = await websocket.recv()

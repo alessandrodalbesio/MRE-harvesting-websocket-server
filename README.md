@@ -1,24 +1,26 @@
 # Websocket Server
+This repository has been developed as part of the project *"Mixed Reality Environment For Harvesting Study"* done by Alessandro Dalbesio.
 
 ## Getting started
 This is the websocket implementation needed for implementing a dual-way real time communication between the devices. <br><br>
 The main functionalities that this server implements are:
 - Real time synchronization between all the devices
-- Real time synchronization between the optitrack server and the headset
+- Real time synchronization between the optitrack and the headset
+
+A schema of the connection of the Websocket Server is shown below: <br>
+![Websocket Server Schema](readme-files/schema.png)
 
 ## Installation
-To use the code into this repository you just need to clode the code and set the parameters in the file <code>settings.py</code>. <br>
-Without settings these parameters you won't be able to start the code! <br>
-A brief description of the parameters can be found in the file itself.
-
-## Requirements
-This code has been tested with python 3.11 <br>
-All the needed modules can be installed from the <code>requirements.txt</code> with the following code:
-```bash
-pip install -r requirements.txt
+It's highly recomended to install this repository directly with the [server](https://gitlab.epfl.ch/create-lab/sensing-with-vr/server) installer. <br>
+You can easily modify the settings of the Websocket Server by modifying the <code>settings.py</code> file. <br>
+Some of the parameters are imported from the file <code>settings.json</code> to be able to define some parameters directly from the [server](https://gitlab.epfl.ch/create-lab/sensing-with-vr/server) installer. <br><br>
+If you wish to install the Websocket Server without the installer you should create a <code>settings.json</code> file with the following structure (you can change the values):
+```json
+{
+    "WEBSOCKET_SERVER_PORT": 8080,
+    "WEBSOCKET_SERVER_ADDRESS": "localhost"
+}
 ```
-If you wish to use a virtual environment just remember to activate it before running this command!
-
 ## Authors
 This repository is part of the project "Mixed Reality Environment For Harvesting Study" done by Alessandro Dalbesio 352298.<br>
 The project has been done in the CREATE LAB (EPFL).<br>
